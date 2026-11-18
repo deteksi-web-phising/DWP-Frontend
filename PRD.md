@@ -4,7 +4,7 @@
 - **Nama Dokumen**: Product Requirement Document (PRD) – Sistem Deteksi Phishing Web
 - **Versi**: 1.0 (High-Level / Ringkas)
 - **Status**: Disetujui
-- **Pengembang / Penulis**: Muhammad Fajrul
+- **Tim Pengembang**: Muhammad Fajrul, Daffi Ahmad, dan Panii Nayaka
 - **Mata Kuliah**: Workshop Mesin Pembelajaran (PENS)
 - **Terakhir Diperbarui**: 2026-11-18
 
@@ -183,19 +183,7 @@ Sistem menggunakan pola arsitektur terpisah untuk menjamin modularitas dan perfo
 
 ---
 
-## 7. Rencana Rilis & Milestone Proyek (Roadmap 5 Minggu)
-
-```
-Minggu 1: Preprocessing Dataset & Eksplorasi Data (Dataset Phising Website.csv)
-Minggu 2: Pelatihan, Validasi, & Serialisasi Model ML (Decision Tree, k-NN, Random Forest, K-Means)
-Minggu 3: Pengembangan Backend REST API (FastAPI) & Pembuatan Modul URL Extractor
-Minggu 4: Pembangunan Antarmuka Frontend (React + Vite + Tailwind + Chart.js/Recharts)
-Minggu 5: Integrasi Client-Server, System Testing, Pembuatan Laporan Akhir & Presentasi
-```
-
----
-
-## 8. Kriteria Penerimaan Produk (Acceptance Criteria Ringkas)
+## 7. Kriteria Penerimaan Produk (Acceptance Criteria Ringkas)
 
 1. Dashboard EDA berhasil menampilkan visualisasi grafik interaktif distribusi kelas target dan korelasi fitur.
 2. Tab Benchmark menampilkan tabel perbandingan dan grafik metrik 4 algoritma ML secara akurat.
