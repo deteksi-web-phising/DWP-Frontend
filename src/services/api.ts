@@ -1,80 +1,121 @@
 import axios from 'axios';
 import type {
+  BenchmarkResponse,
+  EdaSummaryResponse,
   ExtractUrlResponse,
   ModelName,
   PhishingFeatures,
   PredictResponse,
-} from '../types/phising';
+} from '../types/phishing';
+import { FEATURES_METADATA } from '../data/featuresMetadata';
+import { MOCK_BENCHMARK_DATA, MOCK_EDA_DATA } from './mockData';
 
-const USE_MOCK = true; // Ubah ke false saat FastAPI lokal sudah siap
-const api = axios.create({ baseURL: 'http://localhost:8000/api/v1' });
+// Ubah ke false saat backend FastAPI lokal sudah berjalan
+export const USE_MOCK = true;
+
+const api = axios.create({
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1',
+  timeout: 10000,
+});
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export const phishingService = {
+  // 1. POST /api/v1/extract-url
   async extractUrl(url: string): Promise<ExtractUrlResponse> {
     if (!USE_MOCK) {
-      const { data } = await api.post('/extract-url', { url });
+      const { data } = await api.post<ExtractUrlResponse>('/extract-url', { url });
       return data;
     }
 
-    await sleep(600);
-    const isSuspicious = url.includes('login') || url.includes('.xyz') || url.includes('@');
-    return {
-      url,
-      features: {
-        having_IP_Address: -1,
-        URL_Length: url.length > 54 ? 1 : -1,
-        Shortining_Service: url.includes('bit.ly') ? 1 : -1,
-        having_At_Symbol: url.includes('@') ? 1 : -1,
-        double_slash_redirecting: -1,
-        Prefix_Suffix: url.includes('-') ? 1 : -1,
-        having_Sub_Domain: 0,
-        SSLfinal_State: url.startsWith('https') ? -1 : 1,
-        Domain_registeration_length: isSuspicious ? 1 : -1,
-        Favicon: -1,
-        port: -1,
-        HTTPS_token: -1,
-        Request_URL: -1,
-        URL_of_Anchor: isSuspicious ? 1 : 0,
-        Links_in_tags: 0,
-        SFH: -1,
-        Submitting_to_email: -1,
-        Abnormal_URL: isSuspicious ? 1 : -1,
-        Redirect: 0,
-        on_mouseover: -1,
-        RightClick: -1,
-        popUpWidnow: -1,
-        Iframe: -1,
-        age_of_domain: isSuspicious ? 1 : -1,
-        DNSRecord: -1,
-        web_traffic: 0,
-        Page_Rank: -1,
-        Google_Index: -1,
-        Links_pointing_to_page: 0,
-        Statistical_report: -1,
-      },
-    };
+    await sleep(300);
+    const lower = url.toLowerCase();
+    const isPhishSample =
+      lower.includes('login') ||
+      lower.includes('.xyz') ||
+      lower.includes('@') ||
+      /\d+\.\d+\.\d+\.\d+/.test(lower);
+
+    const features = {} as PhishingFeatures;
+    FEATURES_METADATA.forEach((f) => {
+      features[f.key] = (f.key === 'Redirect' ? 0 : -1) as never;
+    });
+
+    if (isPhishSample) {
+      features.URL_Length = url.length > 35 ? 1 : 0;
+      features.Prefix_Suffix = lower.includes('-') ? 1 : -1;
+      features.SSLfinal_State = lower.includes('.xyz') ? 1 : 0;
+      features.having_At_Symbol = lower.includes('@') ? 1 : -1;
+      features.having_IP_Address = /\d+\.\d+\.\d+\.\d+/.test(lower) ? 1 : -1;
+      features.Domain_registeration_length = 1;
+      features.URL_of_Anchor = 1;
+      features.Abnormal_URL = 1;
+      features.age_of_domain = 1;
+      features.web_traffic = 1;
+    } else {
+      features.SSLfinal_State = lower.startsWith('https') ? -1 : 1;
+      features.URL_Length = url.length > 54 ? 1 : -1;
+      features.Prefix_Suffix = lower.includes('-') ? 1 : -1;
+    }
+
+    return { url, features };
   },
 
+  // 2. POST /api/v1/predict
   async predict(model_name: ModelName, features: PhishingFeatures): Promise<PredictResponse> {
     if (!USE_MOCK) {
-      const { data } = await api.post('/predict', { model_name, features });
+      const { data } = await api.post<PredictResponse>('/predict', { model_name, features });
       return data;
     }
 
-    await sleep(250);
-    // Simulasi logika deteksi sederhana untuk testing UI
-    const riskFactors = (Object.keys(features) as (keyof PhishingFeatures)[]).filter(
-      (key) => features[key] === 1
-    );
-    const isPhishing = riskFactors.length >= 3;
+    await sleep(120);
+    const riskFactors = FEATURES_METADATA.filter((f) => features[f.key] === 1).map((f) => f.key);
+    const neutralCount = FEATURES_METADATA.filter(
+      (f) => f.key !== 'Redirect' && features[f.key] === 0
+    ).length;
+
+    let riskScore = riskFactors.length + neutralCount * 0.4;
+    if (features.SSLfinal_State === 1) riskScore += 2.5;
+    if (features.URL_of_Anchor === 1) riskScore += 2.0;
+    if (features.having_IP_Address === 1) riskScore += 1.5;
+
+    const isPhishing = riskScore >= 4.5;
+    const modelOffset: Record<ModelName, number> = {
+      random_forest: 0.0,
+      decision_tree: -0.028,
+      knn: -0.041,
+      kmeans: -0.085,
+    };
+
+    const rawConfidence = isPhishing
+      ? Math.min(0.992, 0.78 + riskScore * 0.018 + modelOffset[model_name])
+      : Math.min(0.985, 0.95 - riskScore * 0.03 + modelOffset[model_name]);
 
     return {
       prediction: isPhishing ? 'Phishing' : 'Legitimate',
       label: isPhishing ? 1 : -1,
-      confidence: isPhishing ? 0.94 : 0.91,
-      risk_factors: riskFactors.slice(0, 5),
+      confidence: Math.max(0.55, Number(rawConfidence.toFixed(3))),
+      risk_factors: riskFactors,
     };
+  },
+
+  // 3. GET /api/v1/models/benchmark
+  async getBenchmark(): Promise<BenchmarkResponse> {
+    if (!USE_MOCK) {
+      const { data } = await api.get<BenchmarkResponse>('/models/benchmark');
+      return data;
+    }
+    await sleep(200);
+    return MOCK_BENCHMARK_DATA;
+  },
+
+  // 4. GET /api/v1/dataset/eda-summary
+  async getEdaSummary(): Promise<EdaSummaryResponse> {
+    if (!USE_MOCK) {
+      const { data } = await api.get<EdaSummaryResponse>('/dataset/eda-summary');
+      return data;
+    }
+    await sleep(200);
+    return MOCK_EDA_DATA;
   },
 };
