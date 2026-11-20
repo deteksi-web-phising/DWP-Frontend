@@ -10,12 +10,12 @@ import type {
 import { FEATURES_METADATA } from '../data/featuresMetadata';
 import { MOCK_BENCHMARK_DATA, MOCK_EDA_DATA } from './mockData';
 
-// Ubah ke false saat backend FastAPI lokal sudah berjalan
-export const USE_MOCK = true;
+// Dikontrol via file .env (VITE_USE_MOCK=false untuk live backend, true untuk paksa mock)
+export const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1',
-  timeout: 10000,
+  timeout: 8000,
 });
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -24,8 +24,12 @@ export const phishingService = {
   // 1. POST /api/v1/extract-url
   async extractUrl(url: string): Promise<ExtractUrlResponse> {
     if (!USE_MOCK) {
-      const { data } = await api.post<ExtractUrlResponse>('/extract-url', { url });
-      return data;
+      try {
+        const { data } = await api.post<ExtractUrlResponse>('/extract-url', { url });
+        return data;
+      } catch (err) {
+        console.warn('[phishingService] Live backend unreachable for /extract-url, falling back to mock data.', err);
+      }
     }
 
     await sleep(300);
@@ -64,8 +68,12 @@ export const phishingService = {
   // 2. POST /api/v1/predict
   async predict(model_name: ModelName, features: PhishingFeatures): Promise<PredictResponse> {
     if (!USE_MOCK) {
-      const { data } = await api.post<PredictResponse>('/predict', { model_name, features });
-      return data;
+      try {
+        const { data } = await api.post<PredictResponse>('/predict', { model_name, features });
+        return data;
+      } catch (err) {
+        console.warn('[phishingService] Live backend unreachable for /predict, falling back to mock data.', err);
+      }
     }
 
     await sleep(120);
@@ -102,8 +110,12 @@ export const phishingService = {
   // 3. GET /api/v1/models/benchmark
   async getBenchmark(): Promise<BenchmarkResponse> {
     if (!USE_MOCK) {
-      const { data } = await api.get<BenchmarkResponse>('/models/benchmark');
-      return data;
+      try {
+        const { data } = await api.get<BenchmarkResponse>('/models/benchmark');
+        return data;
+      } catch (err) {
+        console.warn('[phishingService] Live backend unreachable for /models/benchmark, falling back to mock data.', err);
+      }
     }
     await sleep(200);
     return MOCK_BENCHMARK_DATA;
@@ -112,8 +124,12 @@ export const phishingService = {
   // 4. GET /api/v1/dataset/eda-summary
   async getEdaSummary(): Promise<EdaSummaryResponse> {
     if (!USE_MOCK) {
-      const { data } = await api.get<EdaSummaryResponse>('/dataset/eda-summary');
-      return data;
+      try {
+        const { data } = await api.get<EdaSummaryResponse>('/dataset/eda-summary');
+        return data;
+      } catch (err) {
+        console.warn('[phishingService] Live backend unreachable for /dataset/eda-summary, falling back to mock data.', err);
+      }
     }
     await sleep(200);
     return MOCK_EDA_DATA;
