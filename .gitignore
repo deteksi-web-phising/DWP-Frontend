@@ -1,3 +1,7 @@
+# Lockfiles (pnpm is the primary package manager)
+package-lock.json
+yarn.lock
+
 # Logs
 logs
 *.log
